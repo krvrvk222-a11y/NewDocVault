@@ -30,20 +30,15 @@ ScaffoldingReadMe.txt
 *.nupkg
 *.snupkg
 
-# Others
-~$*
-*~
-CodeCoverage/
-
-# MSBuild Logs
-*.binlog
-
 # Test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Environment specific settings
+appsettings.Development.json
 
 ## ================================
 ## Node / Angular Ignore Rules
