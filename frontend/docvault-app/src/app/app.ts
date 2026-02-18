@@ -1,12 +1,10 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+import { UploadComponent } from './components/upload/upload';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
-  templateUrl: './app.html',
-  styleUrl: './app.css'
+  standalone: true,
+  imports: [UploadComponent],
+  template: `<app-upload></app-upload>`
 })
-export class App {
-  protected readonly title = signal('docvault-app');
-}
+export class AppComponent {}

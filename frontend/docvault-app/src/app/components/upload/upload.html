@@ -1,0 +1,24 @@
+<h2>Upload Document</h2>
+
+<input type="file" (change)="onFileSelected($event)" />
+<br /><br />
+<button (click)="uploadFile()">Upload</button>
+
+<p>{{ message }}</p>
+
+<hr>
+
+<h3>Uploaded Documents</h3>
+
+<ul>
+  <li *ngFor="let doc of documents">
+    <strong>{{ doc.fileName }}</strong>
+    <br>
+    Size: {{ formatSize(doc.sizeBytes) }}
+    <br>
+    Uploaded: {{ formatDate(doc.uploadedAt) }}
+    <br>
+    <a [href]="doc.blobUrl" target="_blank">Download</a>
+    <hr>
+  </li>
+</ul>

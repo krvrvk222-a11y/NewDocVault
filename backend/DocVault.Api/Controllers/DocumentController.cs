@@ -1,6 +1,7 @@
-using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
+using Azure.Storage.Sas;
+using Azure.Storage.Blobs;
 using DocVault.Api.Models;
 
 namespace DocVault.Api.Controllers
@@ -14,17 +15,21 @@ namespace DocVault.Api.Controllers
 
         public DocumentsController(
             CosmosClient cosmosClient,
-            BlobContainerClient blobContainer)
+            BlobServiceClient blobServiceClient,
+            IConfiguration configuration)
         {
-            _container = cosmosClient
-                .GetDatabase("docvaultdb")
-                .GetContainer("documents");
+            var databaseName = configuration["Cosmos:DatabaseName"];
+            var containerName = configuration["Cosmos:ContainerName"];
+            var blobContainerName = configuration["Storage:ContainerName"];
 
-            _blobContainer = blobContainer;
+            _container = cosmosClient.GetContainer(databaseName, containerName);
+            _blobContainer = blobServiceClient.GetBlobContainerClient(blobContainerName);
+
+            _blobContainer.CreateIfNotExists();
         }
 
         // =========================
-        // POST: Upload Document
+        // UPLOAD DOCUMENT
         // =========================
         [HttpPost]
         public async Task<IActionResult> Upload(IFormFile file)
@@ -32,16 +37,20 @@ namespace DocVault.Api.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            var fileId = Guid.NewGuid().ToString();
-            var blobClient = _blobContainer.GetBlobClient(fileId);
+            var id = Guid.NewGuid().ToString();
+            var userId = "test-user"; // Later replace with Entra ID user
 
-            using var stream = file.OpenReadStream();
-            await blobClient.UploadAsync(stream, overwrite: true);
+            var blobClient = _blobContainer.GetBlobClient(id);
+
+            using (var stream = file.OpenReadStream())
+            {
+                await blobClient.UploadAsync(stream, overwrite: true);
+            }
 
             var document = new DocumentItem
             {
-                Id = fileId,
-                UserId = "test-user",
+                Id = id,
+                UserId = userId,
                 FileName = file.FileName,
                 BlobUrl = blobClient.Uri.ToString(),
                 ContentType = file.ContentType,
@@ -50,46 +59,55 @@ namespace DocVault.Api.Controllers
                 Status = "pending"
             };
 
-            await _container.CreateItemAsync(
-                document,
-                new PartitionKey("test-user"));
+            await _container.CreateItemAsync(document, new PartitionKey(userId));
 
             return Ok(document);
         }
 
         // =========================
-        // GET: List Documents
+        // GET ALL DOCUMENTS (With SAS)
         // =========================
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.userId = @userId")
-                .WithParameter("@userId", "test-user");
+            var userId = "test-user";
 
-            var iterator = _container.GetItemQueryIterator<dynamic>(query);
+            var queryDefinition = new QueryDefinition(
+                "SELECT * FROM c WHERE c.userId = @userId ORDER BY c.uploadedAt DESC")
+                .WithParameter("@userId", userId);
 
-            var results = new List<DocumentItem>();
+            var iterator = _container.GetItemQueryIterator<DocumentItem>(queryDefinition);
+
+            var results = new List<object>();
 
             while (iterator.HasMoreResults)
             {
                 var response = await iterator.ReadNextAsync();
 
-                foreach (var item in response)
+                foreach (var doc in response)
                 {
-                    var doc = new DocumentItem
+                    var blobClient = _blobContainer.GetBlobClient(doc.Id);
+
+                    var sasBuilder = new BlobSasBuilder
                     {
-                        Id = item.id,
-                        UserId = item.userId,
-                        FileName = item.fileName,
-                        BlobUrl = item.blobUrl,
-                        ContentType = item.contentType,
-                        SizeBytes = item.sizeBytes,
-                        UploadedAt = item.uploadedAt,
-                        Status = item.status
+                        BlobContainerName = _blobContainer.Name,
+                        BlobName = doc.Id,
+                        Resource = "b",
+                        ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(10)
                     };
 
-                    results.Add(doc);
+                    sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+                    var sasUrl = blobClient.GenerateSasUri(sasBuilder);
+
+                    results.Add(new
+                    {
+                        doc.Id,
+                        doc.FileName,
+                        doc.SizeBytes,
+                        doc.UploadedAt,
+                        DownloadUrl = sasUrl.ToString()
+                    });
                 }
             }
 

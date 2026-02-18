@@ -1,33 +1,59 @@
-using Azure.Storage.Blobs;
 using Microsoft.Azure.Cosmos;
+using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Read configuration
+// ========================
+// COSMOS CONFIG
+// ========================
+
 var cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"];
 var cosmosKey = builder.Configuration["Cosmos:Key"];
-var databaseName = builder.Configuration["Cosmos:DatabaseName"];
-var containerName = builder.Configuration["Cosmos:ContainerName"];
 
-var storageConnectionString = builder.Configuration["Storage:ConnectionString"];
-var blobContainerName = builder.Configuration["Storage:ContainerName"];
+if (string.IsNullOrEmpty(cosmosEndpoint))
+    throw new Exception("Cosmos Endpoint is NULL");
 
-// Register CosmosClient
+if (string.IsNullOrEmpty(cosmosKey))
+    throw new Exception("Cosmos Key is NULL");
+
 builder.Services.AddSingleton(s =>
 {
     return new CosmosClient(cosmosEndpoint, cosmosKey);
 });
 
-// Register BlobContainerClient
+// ========================
+// BLOB CONFIG
+// ========================
+
+var storageConnectionString =
+    builder.Configuration["Storage:ConnectionString"];
+
+if (string.IsNullOrEmpty(storageConnectionString))
+    throw new Exception("Storage ConnectionString is NULL");
+
 builder.Services.AddSingleton(s =>
 {
-    var blobServiceClient = new BlobServiceClient(storageConnectionString);
-    return blobServiceClient.GetBlobContainerClient(blobContainerName);
+    return new BlobServiceClient(storageConnectionString);
+});
+
+// ========================
+// CORS
+// ========================
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngular",
+        policy =>
+        {
+            policy
+                .AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
 });
 
 var app = builder.Build();
@@ -35,8 +61,10 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+app.UseCors("AllowAngular");
+
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
