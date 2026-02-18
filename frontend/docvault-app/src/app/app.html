@@ -1,0 +1,34 @@
+<h1>DocVault</h1>
+
+<h3>Upload Document</h3>
+<input type="file" (change)="onFileSelected($event)" />
+<button (click)="upload()">Upload</button>
+
+<hr />
+
+<h3>Uploaded Documents</h3>
+
+<ul>
+  <li *ngFor="let doc of documents">
+    {{ doc.fileName }} -
+    {{ doc.sizeBytes }} bytes -
+    <a [href]="doc.downloadUrl" target="_blank">Download</a>
+  </li>
+</ul>
+<h1>DocVault</h1>
+
+<h3>Upload Document</h3>
+<input type="file" (change)="onFileSelected($event)" />
+<button (click)="upload()">Upload</button>
+
+<hr />
+
+<h3>Uploaded Documents</h3>
+
+<ul>
+  <li *ngFor="let doc of documents">
+    {{ doc.fileName }} -
+    {{ doc.sizeBytes }} bytes -
+    <a [href]="doc.downloadUrl" target="_blank">Download</a>
+  </li>
+</ul>
